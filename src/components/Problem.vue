@@ -39,9 +39,12 @@
         narrowed
       >
         <template slot-scope="props">
-          <b-table-column field="name" label="Problem (click to select)" sortable>{{
-            props.row.name
-          }}</b-table-column>
+          <b-table-column
+            field="name"
+            label="Problem (click to select)"
+            sortable
+            >{{ props.row.name }}</b-table-column
+          >
 
           <b-table-column
             field="domain.length"
@@ -236,8 +239,8 @@
             required
             v-model="objs[idx].direction"
           >
-            <option :value="ObjDirectionJs.Max" numeric>Maximize</option>
-            <option :value="ObjDirectionJs.Min" numeric>Minimize</option>
+            <option :value="ObjDirection.Max" numeric>Maximize</option>
+            <option :value="ObjDirection.Min" numeric>Minimize</option>
           </b-select>
         </div>
         <div class="column has-text-right is-3">
@@ -297,15 +300,15 @@
 
 <script lang="ts">
 import {
-  DomainJs,
-  ObjDirectionJs,
-  OptProblemDefinitionsBuilderJs,
-  OptFacadeBuilderJs,
-  OptProblemJs,
-  OptProblemResultsJs,
-  HardCstrJs,
-  ObjJs,
-  PctJs
+  ObjDirection,
+  OptProblemDefinitionsBuilder,
+  OptFacadeBuilder,
+  OptProblem,
+  OptProblemResults,
+  HardCstr,
+  Obj,
+  Pct,
+  SolutionDomain
 } from "@/mop_bindings";
 import { Component, Vue } from "vue-property-decorator";
 import BinhandKorn from "@/problems/BinhandKorn";
@@ -321,7 +324,7 @@ interface ProblemDefinitions {
   hardCstrs: string[];
   maxIterations?: number;
   name: string;
-  objs: { direction: ObjDirectionJs; fn: string }[];
+  objs: { direction: ObjDirection; fn: string }[];
   resultsNum?: number;
   source: string;
   stagnationPercentage?: number;
@@ -337,9 +340,9 @@ export default class Problem extends Vue {
   hasValidObjsInput = true;
   isExamplesModalActivated = false;
   maxIterations = 500;
-  ObjDirectionJs = ObjDirectionJs;
+  ObjDirection = ObjDirection;
   objs: ProblemDefinitions["objs"] = [];
-  results?: OptProblemResultsJs;
+  results?: OptProblemResults;
   resultsNum = 100;
   stagnationPercentage = 1;
   stagnationThreshold = 50;
@@ -350,13 +353,7 @@ export default class Problem extends Vue {
 
   addObj() {
     this.hasValidObjsInput = true;
-    this.objs.push({ direction: ObjDirectionJs.Min, fn: "" });
-  }
-
-  clearProblem() {
-    this.domain = [];
-    this.objs = [];
-    this.hardCstrs = [];
+    this.objs.push({ direction: ObjDirection.Min, fn: "" });
   }
 
   beforeAddingDomain(domain: string) {
@@ -367,29 +364,39 @@ export default class Problem extends Vue {
     return this.isNumber(parts[0]) && this.isNumber(parts[1]);
   }
 
+  clearProblem() {
+    this.domain = [];
+    this.objs = [];
+    this.hardCstrs = [];
+    this.$emit("hasResults", null);
+  }
+
   doSolve() {
-    let opdbj = new OptProblemDefinitionsBuilderJs()
-      .domain(new DomainJs(this.domain))
-      .results_num(this.resultsNum);
+    let opdbj = new OptProblemDefinitionsBuilder()
+      .domain(new SolutionDomain(this.domain))
+      .name("Problem");
 
     this.hardCstrs.forEach(x => {
-      const hc = new HardCstrJs(this.evalToFunction(x));
+      const hc = new HardCstr(this.evalToFunction(x));
       opdbj = opdbj.push_hard_cstr(hc);
     });
+
     this.objs.forEach(x => {
-      const obj = new ObjJs(x.direction, this.evalToFunction(x.fn));
+      const obj = new Obj(x.direction, this.evalToFunction(x.fn));
       opdbj = opdbj.push_obj(obj);
     });
 
-    this.results = new OptFacadeBuilderJs()
+    const problem = OptProblem.with_capacity(opdbj.build(), this.resultsNum);
+
+    const facade = new OptFacadeBuilder()
       .max_iterations(this.maxIterations)
-      .opt_problem(OptProblemJs.with_capacity(opdbj.build()))
-      .stagnation_percentage(PctJs.from_percent(this.stagnationPercentage))
+      .stagnation_percentage(Pct.from_percent(this.stagnationPercentage))
       .stagnation_threshold(this.stagnationThreshold)
-      .build()
-      .solve()
-      .opt_problem()
-      .results();
+      .build(problem);
+
+    facade.solve(problem);
+
+    this.results = problem.results();
   }
 
   evalToFunction(fn: string) {
@@ -408,6 +415,7 @@ export default class Problem extends Vue {
     this.stagnationThreshold =
       problem.stagnationThreshold || this.stagnationThreshold;
     this.validateInputs();
+    this.$emit("hasResults", null);
   }
 
   hasValidInputs(): boolean {

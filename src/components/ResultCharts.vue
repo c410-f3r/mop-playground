@@ -11,12 +11,12 @@
 <script lang="ts">
 import { Chart } from "chart.js";
 import { Component, Prop, Vue } from "vue-property-decorator";
-import { OptProblemResultJs } from "@/mop_bindings";
+import { OptProblemResult } from "@/mop_bindings";
 
 @Component
 export default class ResultCharts extends Vue {
   @Prop()
-  result?: OptProblemResultJs;
+  result?: OptProblemResult;
 
   mounted() {
     if (typeof this.result === "undefined") {
@@ -49,19 +49,19 @@ export default class ResultCharts extends Vue {
     });
   }
 
-  hardCstrsChartData(result: OptProblemResultJs): GenericChart {
+  hardCstrsChartData(result: OptProblemResult): GenericChart {
     const chart: GenericChart = {
       datasets: [{ borderWidth: 1, data: [], label: "Hard constraints" }],
       labels: []
     };
-    result.hard_cstrs_results().forEach((hcr: number, idx: number) => {
+    result.hard_cstrs().forEach((hcr: number, idx: number) => {
       chart.datasets[0].data.push(hcr);
       chart.labels.push(idx + 1);
     });
     return chart;
   }
 
-  objsChartData(result: OptProblemResultJs): GenericChart {
+  objsChartData(result: OptProblemResult): GenericChart {
     const chart: GenericChart = {
       datasets: [{ borderWidth: 1, data: [], label: "Objectives" }],
       labels: []
@@ -73,7 +73,7 @@ export default class ResultCharts extends Vue {
     return chart;
   }
 
-  solutionChartData(result: OptProblemResultJs): GenericChart {
+  solutionChartData(result: OptProblemResult): GenericChart {
     const chart: GenericChart = {
       datasets: [{ borderWidth: 1, data: [], label: "Solution" }],
       labels: []

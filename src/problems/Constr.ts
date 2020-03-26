@@ -1,4 +1,4 @@
-const { ObjDirectionJs } = window.mop;
+const { ObjDirection } = window.mop;
 
 export default {
   domain: ["0.1=1.0", "0.0=5.0"],
@@ -8,9 +8,9 @@ export default {
   ],
   name: "Constr",
   objs: [
-    { direction: ObjDirectionJs.Min, fn: "return solution[0];" },
+    { direction: ObjDirection.Min, fn: "return solution[0];" },
     {
-      direction: ObjDirectionJs.Min,
+      direction: ObjDirection.Min,
       fn: "return (1.0 + solution[1]) / solution[0];"
     }
   ],

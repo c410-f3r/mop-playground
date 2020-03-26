@@ -1,114 +1,171 @@
 /* eslint-disable */
-export enum ObjDirectionJs {Max,Min,}
-export class OptFacadeBuilderJs {
-free(): void;
-
- constructor();
-
- build(): OptFacadeJs;
-
- max_iterations(arg0: number): OptFacadeBuilderJs;
-
- objs_goals(arg0: Float64Array): OptFacadeBuilderJs;
-
- opt_problem(arg0: OptProblemJs): OptFacadeBuilderJs;
-
- stagnation_percentage(arg0: PctJs): OptFacadeBuilderJs;
-
- stagnation_threshold(arg0: number): OptFacadeBuilderJs;
-
+export enum ObjDirection {
+  Max,
+  Min,
 }
-export class HardCstrJs {
-free(): void;
-
- constructor(arg0: any);
-
+export class HardCstr {
+  free(): void;
+/**
+* @param {Function} f 
+*/
+  constructor(f: Function);
 }
-export class OptProblemJs {
-free(): void;
-
-static  with_capacity(arg0: OptProblemDefinitionsJs): OptProblemJs;
-
- definitions(): OptProblemDefinitionsJs;
-
- results(): OptProblemResultsJs;
-
+export class Obj {
+  free(): void;
+/**
+* @param {number} od 
+* @param {Function} f 
+*/
+  constructor(od: number, f: Function);
 }
-export class DomainJs {
-free(): void;
-
- constructor(arg0: any[]);
-
+export class OptFacade {
+  free(): void;
+/**
+* @param {OptProblem} problem 
+* @returns {OptFacade} 
+*/
+  solve(problem: OptProblem): OptFacade;
 }
-export class OptProblemDefinitionsJs {
-free(): void;
-
+export class OptFacadeBuilder {
+  free(): void;
+/**
+*/
+  constructor();
+/**
+* @param {OptProblem} problem 
+* @returns {OptFacade} 
+*/
+  build(problem: OptProblem): OptFacade;
+/**
+* @param {number} max_iterations 
+* @returns {OptFacadeBuilder} 
+*/
+  max_iterations(max_iterations: number): OptFacadeBuilder;
+/**
+* @param {Float64Array} objs_goals 
+* @returns {OptFacadeBuilder} 
+*/
+  objs_goals(objs_goals: Float64Array): OptFacadeBuilder;
+/**
+* @param {Pct} stagnation_percentage 
+* @returns {OptFacadeBuilder} 
+*/
+  stagnation_percentage(stagnation_percentage: Pct): OptFacadeBuilder;
+/**
+* @param {number} stagnation_threshold 
+* @returns {OptFacadeBuilder} 
+*/
+  stagnation_threshold(stagnation_threshold: number): OptFacadeBuilder;
 }
-export class SolutionJs {
-free(): void;
-
- array(): Float64Array;
-
+export class OptProblem {
+  free(): void;
+/**
+* @param {OptProblemDefinitions} definitions 
+* @param {number} results_num 
+* @returns {OptProblem} 
+*/
+  static with_capacity(definitions: OptProblemDefinitions, results_num: number): OptProblem;
+/**
+* @returns {OptProblemDefinitions} 
+*/
+  definitions(): OptProblemDefinitions;
+/**
+* @returns {OptProblemResults} 
+*/
+  results(): OptProblemResults;
 }
-export class ObjJs {
-free(): void;
-
- constructor(arg0: number, arg1: any);
-
+export class OptProblemDefinitions {
+  free(): void;
 }
-export class OptProblemResultsJs {
-free(): void;
-
- best(): OptProblemResultJs;
-
- get(arg0: number): OptProblemResultJs;
-
- len(): number;
-
+export class OptProblemDefinitionsBuilder {
+  free(): void;
+/**
+*/
+  constructor();
+/**
+* @returns {OptProblemDefinitions} 
+*/
+  build(): OptProblemDefinitions;
+/**
+* @param {SolutionDomain} solution_domain 
+* @returns {OptProblemDefinitionsBuilder} 
+*/
+  domain(solution_domain: SolutionDomain): OptProblemDefinitionsBuilder;
+/**
+* @param {string} name 
+* @returns {OptProblemDefinitionsBuilder} 
+*/
+  name(name: string): OptProblemDefinitionsBuilder;
+/**
+* @param {HardCstr} hard_cstr 
+* @returns {OptProblemDefinitionsBuilder} 
+*/
+  push_hard_cstr(hard_cstr: HardCstr): OptProblemDefinitionsBuilder;
+/**
+* @param {Obj} obj 
+* @returns {OptProblemDefinitionsBuilder} 
+*/
+  push_obj(obj: Obj): OptProblemDefinitionsBuilder;
 }
-export class OptProblemDefinitionsBuilderJs {
-free(): void;
-
- constructor();
-
- build(): OptProblemDefinitionsJs;
-
- domain(arg0: DomainJs): OptProblemDefinitionsBuilderJs;
-
- push_hard_cstr(arg0: HardCstrJs): OptProblemDefinitionsBuilderJs;
-
- push_obj(arg0: ObjJs): OptProblemDefinitionsBuilderJs;
-
- results_num(arg0: number): OptProblemDefinitionsBuilderJs;
-
- vars_num(arg0: number, arg1: number): OptProblemDefinitionsBuilderJs;
-
+export class OptProblemResult {
+  free(): void;
+/**
+* @returns {Uint32Array} 
+*/
+  hard_cstrs(): Uint32Array;
+/**
+* @returns {Float64Array} 
+*/
+  objs(): Float64Array;
+/**
+* @returns {number} 
+*/
+  objs_avg(): number;
+/**
+* @returns {Solution} 
+*/
+  solution(): Solution;
 }
-export class OptProblemResultJs {
-free(): void;
-
- hard_cstrs_results(): Uint32Array;
-
- objs(): Float64Array;
-
- objs_avg(): number;
-
- solution(): SolutionJs;
-
+export class OptProblemResults {
+  free(): void;
+/**
+* @returns {OptProblemResult | undefined} 
+*/
+  best(): OptProblemResult | undefined;
+/**
+* @param {number} idx 
+* @returns {OptProblemResult} 
+*/
+  get(idx: number): OptProblemResult;
+/**
+* @returns {number} 
+*/
+  len(): number;
 }
-export class PctJs {
-free(): void;
-
-static  from_decimal(arg0: number): PctJs;
-
-static  from_percent(arg0: number): PctJs;
-
+export class Pct {
+  free(): void;
+/**
+* @param {number} pct 
+* @returns {Pct} 
+*/
+  static from_decimal(pct: number): Pct;
+/**
+* @param {number} pct 
+* @returns {Pct} 
+*/
+  static from_percent(pct: number): Pct;
 }
-export class OptFacadeJs {
-free(): void;
-
- opt_problem(): OptProblemJs;
-
- solve(): OptFacadeJs;
-
+export class Solution {
+  free(): void;
+/**
+* @returns {Float64Array} 
+*/
+  array(): Float64Array;
+}
+export class SolutionDomain {
+  free(): void;
+/**
+* @param {any[]} ranges 
+*/
+  constructor(ranges: any[]);
 }

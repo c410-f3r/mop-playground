@@ -7,12 +7,12 @@
 <script lang="ts">
 import { Chart } from "chart.js";
 import { Component, Prop, Vue } from "vue-property-decorator";
-import { OptProblemResultsJs } from "@/mop_bindings";
+import { OptProblemResults } from "@/mop_bindings";
 
 @Component
 export default class ObjsAvgChart extends Vue {
   @Prop()
-  results?: OptProblemResultsJs;
+  results?: OptProblemResults;
 
   mounted() {
     if (typeof this.results === "undefined") {
@@ -29,7 +29,7 @@ export default class ObjsAvgChart extends Vue {
     });
   }
 
-  objsAvgChartData(results: OptProblemResultsJs): GenericChart {
+  objsAvgChartData(results: OptProblemResults): GenericChart {
     const chart: GenericChart = {
       datasets: [{ borderWidth: 1, data: [], label: "Objectives avg" }],
       labels: []

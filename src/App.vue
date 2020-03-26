@@ -17,14 +17,13 @@
       <div class="container">
         <div class="columns">
           <div class="column is-4">
-            The solver,
-            <a href="https://gitlab.com/c410-f3r/mop" target="_blank">MOP</a>,
-            was written in
-            <a href="https://www.rust-lang.org" target="_blank">Rust</a> and
-            compiled to
-            <a href="https://webassembly.org/" target="_blank">WASM</a>.<br />
-            Beware of potential issues as the solver and this website are both
-            experimental.
+            This prayground is a
+            <a href="https://webassembly.org/" target="_blank">WASM</a> compiled
+            version of
+            <a href="https://github.com/c410-f3r/mop" target="_blank">MOP</a>, a
+            framework written in
+            <a href="https://www.rust-lang.org" target="_blank">Rust</a> to
+            solve NP-Problems.
           </div>
           <div class="column is-offset-4">
             Made by
@@ -38,7 +37,7 @@
 
 <script lang="ts">
 import { Component, Vue } from "vue-property-decorator";
-import { OptProblemResultsJs } from "./mop_bindings";
+import { OptProblemResults } from "./mop_bindings";
 import Problem from "./components/Problem.vue";
 import Results from "./components/Results.vue";
 
@@ -49,8 +48,8 @@ import Results from "./components/Results.vue";
   }
 })
 export default class App extends Vue {
-  results: OptProblemResultsJs | null = null;
-  hasResults(results: OptProblemResultsJs) {
+  results: OptProblemResults | null = null;
+  hasResults(results: OptProblemResults) {
     this.results = results;
   }
 }

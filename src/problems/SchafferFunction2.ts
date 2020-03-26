@@ -1,4 +1,4 @@
-const { ObjDirectionJs } = window.mop;
+const { ObjDirection } = window.mop;
 
 export default {
   domain: ["-5=10"],
@@ -6,7 +6,7 @@ export default {
   name: "Schaffer - Function #2",
   objs: [
     {
-      direction: ObjDirectionJs.Min,
+      direction: ObjDirection.Min,
       fn: `let x = solution[0];
 if (x <= 1) {
   return -x;
@@ -22,7 +22,7 @@ else {
 }`
     },
     {
-      direction: ObjDirectionJs.Min,
+      direction: ObjDirection.Min,
       fn: "return Math.pow(solution[0], 2) - 10 * solution[0] + 25;"
     }
   ],
