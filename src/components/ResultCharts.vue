@@ -11,12 +11,12 @@
 <script lang="ts">
 import { Chart } from "chart.js";
 import { Component, Prop, Vue } from "vue-property-decorator";
-import { OptProblemResultJs } from "@/mop_bindings";
+import { OptProblemResult } from "@/mop_bindings";
 
 @Component
 export default class ResultCharts extends Vue {
   @Prop()
-  result?: OptProblemResultJs;
+  result?: OptProblemResult;
 
   mounted() {
     if (typeof this.result === "undefined") {
@@ -28,43 +28,43 @@ export default class ResultCharts extends Vue {
       data: this.solutionChartData(this.result),
       options: {
         layout: { padding: { left: 15, right: 15, top: 15, bottom: 15 } },
-        scales: { yAxes: [{ ticks: { beginAtZero: true } }] }
-      }
+        scales: { yAxes: [{ ticks: { beginAtZero: true } }] },
+      },
     });
     new Chart(document.getElementById("objs-chart"), {
       type: "bar",
       data: this.objsChartData(this.result),
       options: {
         layout: { padding: { left: 15, right: 15, top: 15, bottom: 15 } },
-        scales: { yAxes: [{ ticks: { beginAtZero: true } }] }
-      }
+        scales: { yAxes: [{ ticks: { beginAtZero: true } }] },
+      },
     });
     new Chart(document.getElementById("hard-cstrs-chart"), {
       type: "bar",
       data: this.hardCstrsChartData(this.result),
       options: {
         layout: { padding: { left: 15, right: 15, top: 15, bottom: 15 } },
-        scales: { yAxes: [{ ticks: { beginAtZero: true } }] }
-      }
+        scales: { yAxes: [{ ticks: { beginAtZero: true } }] },
+      },
     });
   }
 
-  hardCstrsChartData(result: OptProblemResultJs): GenericChart {
+  hardCstrsChartData(result: OptProblemResult): GenericChart {
     const chart: GenericChart = {
       datasets: [{ borderWidth: 1, data: [], label: "Hard constraints" }],
-      labels: []
+      labels: [],
     };
-    result.hard_cstrs_results().forEach((hcr: number, idx: number) => {
+    result.hard_cstrs().forEach((hcr: number, idx: number) => {
       chart.datasets[0].data.push(hcr);
       chart.labels.push(idx + 1);
     });
     return chart;
   }
 
-  objsChartData(result: OptProblemResultJs): GenericChart {
+  objsChartData(result: OptProblemResult): GenericChart {
     const chart: GenericChart = {
       datasets: [{ borderWidth: 1, data: [], label: "Objectives" }],
-      labels: []
+      labels: [],
     };
     result.objs().forEach((obj: number, idx: number) => {
       chart.datasets[0].data.push(obj);
@@ -73,10 +73,10 @@ export default class ResultCharts extends Vue {
     return chart;
   }
 
-  solutionChartData(result: OptProblemResultJs): GenericChart {
+  solutionChartData(result: OptProblemResult): GenericChart {
     const chart: GenericChart = {
       datasets: [{ borderWidth: 1, data: [], label: "Solution" }],
-      labels: []
+      labels: [],
     };
     result
       .solution()

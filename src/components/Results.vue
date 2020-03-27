@@ -41,29 +41,29 @@
 
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
-import { OptProblemResultJs, OptProblemResultsJs } from "@/mop_bindings";
+import { OptProblemResult, OptProblemResults } from "@/mop_bindings";
 import ObjsAvgChart from "@/components/ObjsAvgChart.vue";
 import ResultCharts from "@/components/ResultCharts.vue";
 
 enum ResultsModalType {
   Log,
   ObjsAvg,
-  Result
+  Result,
 }
 
 @Component
 export default class Result extends Vue {
   @Prop()
-  results: OptProblemResultsJs | null = null;
+  results: OptProblemResults | null = null;
 
   ResultsModalType = ResultsModalType;
   isResultsModalActivated = false;
 
-  resultToString(result: OptProblemResultJs) {
+  resultToString(result: OptProblemResult) {
     let str = "";
     const solution = result.solution().array();
     const objs = result.objs();
-    const hcr = result.hard_cstrs_results();
+    const hcr = result.hard_cstrs();
 
     str += `Solution | x0: ${solution[0]}`;
     solution.slice(1).forEach((x: number, idx: number) => {
@@ -88,11 +88,14 @@ export default class Result extends Vue {
     return str;
   }
 
-  showLog(results: OptProblemResultsJs) {
+  showLog(results: OptProblemResults) {
     let log = "";
-    log += "***** Best result *****\n";
-    log += this.resultToString(results.best());
-    log += "\n";
+    const best = results.best();
+    if (best !== undefined) {
+      log += "***** Best result *****\n";
+      log += this.resultToString(best);
+      log += "\n";
+    }
     for (let idx = 0; idx < results.len(); idx++) {
       log += `***** Result ${idx + 1} *****\n`;
       log += this.resultToString(results.get(idx));
@@ -100,19 +103,19 @@ export default class Result extends Vue {
     this.$buefy.modal.open("<pre>" + log + "</pre>");
   }
 
-  showObjsAvgModal(results: OptProblemResultsJs) {
+  showObjsAvgModal(results: OptProblemResults) {
     this.$buefy.modal.open({
       component: ObjsAvgChart,
       parent: this,
-      props: { results }
+      props: { results },
     });
   }
 
-  showResultModal(result: OptProblemResultJs) {
+  showResultModal(result: OptProblemResult) {
     this.$buefy.modal.open({
       component: ResultCharts,
       parent: this,
-      props: { result }
+      props: { result },
     });
   }
 }

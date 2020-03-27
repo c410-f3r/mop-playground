@@ -3,7 +3,7 @@ import {
   faAngleRight,
   faArrowUp,
   faChevronRight,
-  faQuestionCircle
+  faQuestionCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import "./registerServiceWorker";
@@ -17,14 +17,14 @@ Vue.config.productionTip = false;
 Vue.use(Buefy, { defaultIconPack: "fa" });
 Vue.component("font-awesome-icon", FontAwesomeIcon);
 
-import("./mop_bindings").then(mop => {
+import("./mop_bindings").then((mop) => {
   window.mop = mop;
   const vue = new Vue({
     components: {
-      App: () => import("./App.vue")
+      App: () => import("./App.vue"),
     },
     el: "#app",
-    render: h => h("App")
+    render: (h) => h("App"),
   });
   return vue;
 });

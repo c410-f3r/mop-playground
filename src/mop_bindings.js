@@ -1,761 +1,908 @@
 /* eslint-disable */
-import * as wasm from './mop_bindings_bg'
+import * as wasm from './mop_bindings_bg.wasm';
 
-let cachegetUint32Memory = null
-function getUint32Memory () {
-  if (cachegetUint32Memory === null || cachegetUint32Memory.buffer !== wasm.memory.buffer) {
-    cachegetUint32Memory = new Uint32Array(wasm.memory.buffer)
-  }
-  return cachegetUint32Memory
+const heap = new Array(32).fill(undefined);
+
+heap.push(undefined, null, true, false);
+
+function getObject(idx) { return heap[idx]; }
+
+let heap_next = heap.length;
+
+function dropObject(idx) {
+    if (idx < 36) return;
+    heap[idx] = heap_next;
+    heap_next = idx;
 }
 
-const slab = [{ obj: undefined }, { obj: null }, { obj: true }, { obj: false }]
-
-let slab_next = slab.length
-
-function addHeapObject (obj) {
-  if (slab_next === slab.length) slab.push(slab.length + 1)
-  const idx = slab_next
-  const next = slab[idx]
-
-  slab_next = next
-
-  slab[idx] = { obj, cnt: 1 }
-  return idx << 1
+function takeObject(idx) {
+    const ret = getObject(idx);
+    dropObject(idx);
+    return ret;
 }
 
-function passArrayJsValueToWasm (array) {
-  const ptr = wasm.__wbindgen_malloc(array.length * 4)
-  const mem = getUint32Memory()
-  for (let i = 0; i < array.length; i++) {
-    mem[ptr / 4 + i] = addHeapObject(array[i])
-  }
-  return [ptr, array.length]
+function addHeapObject(obj) {
+    if (heap_next === heap.length) heap.push(heap.length + 1);
+    const idx = heap_next;
+    heap_next = heap[idx];
+
+    heap[idx] = obj;
+    return idx;
+}
+
+function isLikeNone(x) {
+    return x === undefined || x === null;
+}
+
+let cachegetFloat64Memory0 = null;
+function getFloat64Memory0() {
+    if (cachegetFloat64Memory0 === null || cachegetFloat64Memory0.buffer !== wasm.memory.buffer) {
+        cachegetFloat64Memory0 = new Float64Array(wasm.memory.buffer);
+    }
+    return cachegetFloat64Memory0;
+}
+
+let cachegetInt32Memory0 = null;
+function getInt32Memory0() {
+    if (cachegetInt32Memory0 === null || cachegetInt32Memory0.buffer !== wasm.memory.buffer) {
+        cachegetInt32Memory0 = new Int32Array(wasm.memory.buffer);
+    }
+    return cachegetInt32Memory0;
+}
+
+let WASM_VECTOR_LEN = 0;
+
+let cachegetUint8Memory0 = null;
+function getUint8Memory0() {
+    if (cachegetUint8Memory0 === null || cachegetUint8Memory0.buffer !== wasm.memory.buffer) {
+        cachegetUint8Memory0 = new Uint8Array(wasm.memory.buffer);
+    }
+    return cachegetUint8Memory0;
+}
+
+const lTextEncoder = typeof TextEncoder === 'undefined' ? require('util').TextEncoder : TextEncoder;
+
+let cachedTextEncoder = new lTextEncoder('utf-8');
+
+const encodeString = (typeof cachedTextEncoder.encodeInto === 'function'
+    ? function (arg, view) {
+    return cachedTextEncoder.encodeInto(arg, view);
+}
+    : function (arg, view) {
+    const buf = cachedTextEncoder.encode(arg);
+    view.set(buf);
+    return {
+        read: arg.length,
+        written: buf.length
+    };
+});
+
+function passStringToWasm0(arg, malloc, realloc) {
+
+    if (realloc === undefined) {
+        const buf = cachedTextEncoder.encode(arg);
+        const ptr = malloc(buf.length);
+        getUint8Memory0().subarray(ptr, ptr + buf.length).set(buf);
+        WASM_VECTOR_LEN = buf.length;
+        return ptr;
+    }
+
+    let len = arg.length;
+    let ptr = malloc(len);
+
+    const mem = getUint8Memory0();
+
+    let offset = 0;
+
+    for (; offset < len; offset++) {
+        const code = arg.charCodeAt(offset);
+        if (code > 0x7F) break;
+        mem[ptr + offset] = code;
+    }
+
+    if (offset !== len) {
+        if (offset !== 0) {
+            arg = arg.slice(offset);
+        }
+        ptr = realloc(ptr, len, len = offset + arg.length * 3);
+        const view = getUint8Memory0().subarray(ptr + offset, ptr + len);
+        const ret = encodeString(arg, view);
+
+        offset += ret.written;
+    }
+
+    WASM_VECTOR_LEN = offset;
+    return ptr;
+}
+
+function debugString(val) {
+    // primitive types
+    const type = typeof val;
+    if (type == 'number' || type == 'boolean' || val == null) {
+        return  `${val}`;
+    }
+    if (type == 'string') {
+        return `"${val}"`;
+    }
+    if (type == 'symbol') {
+        const description = val.description;
+        if (description == null) {
+            return 'Symbol';
+        } else {
+            return `Symbol(${description})`;
+        }
+    }
+    if (type == 'function') {
+        const name = val.name;
+        if (typeof name == 'string' && name.length > 0) {
+            return `Function(${name})`;
+        } else {
+            return 'Function';
+        }
+    }
+    // objects
+    if (Array.isArray(val)) {
+        const length = val.length;
+        let debug = '[';
+        if (length > 0) {
+            debug += debugString(val[0]);
+        }
+        for(let i = 1; i < length; i++) {
+            debug += ', ' + debugString(val[i]);
+        }
+        debug += ']';
+        return debug;
+    }
+    // Test for built-in
+    const builtInMatches = /\[object ([^\]]+)\]/.exec(toString.call(val));
+    let className;
+    if (builtInMatches.length > 1) {
+        className = builtInMatches[1];
+    } else {
+        // Failed to match the standard '[object ClassName]'
+        return toString.call(val);
+    }
+    if (className == 'Object') {
+        // we're a user defined class or Object
+        // JSON.stringify avoids problems with cycles, and is generally much
+        // easier than looping through ownProperties of `val`.
+        try {
+            return 'Object(' + JSON.stringify(val) + ')';
+        } catch (_) {
+            return 'Object';
+        }
+    }
+    // errors
+    if (val instanceof Error) {
+        return `${val.name}: ${val.message}\n${val.stack}`;
+    }
+    // TODO we could test for more things here, like `Set`s and `Map`s.
+    return className;
+}
+
+const lTextDecoder = typeof TextDecoder === 'undefined' ? require('util').TextDecoder : TextDecoder;
+
+let cachedTextDecoder = new lTextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+
+cachedTextDecoder.decode();
+
+function getStringFromWasm0(ptr, len) {
+    return cachedTextDecoder.decode(getUint8Memory0().subarray(ptr, ptr + len));
+}
+
+function makeMutClosure(arg0, arg1, dtor, f) {
+    const state = { a: arg0, b: arg1, cnt: 1 };
+    const real = (...args) => {
+        // First up with a closure we increment the internal reference
+        // count. This ensures that the Rust closure environment won't
+        // be deallocated while we're invoking it.
+        state.cnt++;
+        const a = state.a;
+        state.a = 0;
+        try {
+            return f(a, state.b, ...args);
+        } finally {
+            if (--state.cnt === 0) wasm.__wbindgen_export_2.get(dtor)(a, state.b);
+            else state.a = a;
+        }
+    };
+    real.original = state;
+    return real;
+}
+function __wbg_adapter_18(arg0, arg1, arg2) {
+    wasm.wasm_bindgen__convert__closures__invoke1_mut__hd55fba778bbb5e0a(arg0, arg1, addHeapObject(arg2));
+}
+
+let cachegetUint32Memory0 = null;
+function getUint32Memory0() {
+    if (cachegetUint32Memory0 === null || cachegetUint32Memory0.buffer !== wasm.memory.buffer) {
+        cachegetUint32Memory0 = new Uint32Array(wasm.memory.buffer);
+    }
+    return cachegetUint32Memory0;
+}
+
+function passArrayJsValueToWasm0(array, malloc) {
+    const ptr = malloc(array.length * 4);
+    const mem = getUint32Memory0();
+    for (let i = 0; i < array.length; i++) {
+        mem[ptr / 4 + i] = addHeapObject(array[i]);
+    }
+    WASM_VECTOR_LEN = array.length;
+    return ptr;
+}
+
+function _assertClass(instance, klass) {
+    if (!(instance instanceof klass)) {
+        throw new Error(`expected instance of ${klass.name}`);
+    }
+    return instance.ptr;
+}
+
+function passArrayF64ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 8);
+    getFloat64Memory0().set(arg, ptr / 8);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function getArrayU32FromWasm0(ptr, len) {
+    return getUint32Memory0().subarray(ptr / 4, ptr / 4 + len);
+}
+
+function getArrayF64FromWasm0(ptr, len) {
+    return getFloat64Memory0().subarray(ptr / 8, ptr / 8 + len);
+}
+
+function handleError(e) {
+    wasm.__wbindgen_exn_store(addHeapObject(e));
+}
+
+function getArrayU8FromWasm0(ptr, len) {
+    return getUint8Memory0().subarray(ptr / 1, ptr / 1 + len);
+}
+function __wbg_adapter_68(arg0, arg1, arg2, arg3) {
+    wasm.wasm_bindgen__convert__closures__invoke2_mut__h4744e4549892ca8d(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+}
+
+/**
+*/
+export const ObjDirection = Object.freeze({ Max:0,Min:1, });
+/**
+*/
+export class HardCstr {
+
+    static __wrap(ptr) {
+        const obj = Object.create(HardCstr.prototype);
+        obj.ptr = ptr;
+
+        return obj;
+    }
+
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        wasm.__wbg_hardcstr_free(ptr);
+    }
+    /**
+    * @param {Function} f
+    */
+    constructor(f) {
+        var ret = wasm.hardcstr_new(addHeapObject(f));
+        return HardCstr.__wrap(ret);
+    }
 }
 /**
 */
-export const ObjDirectionJs = Object.freeze({ Max: 0, Min: 1 })
+export class Obj {
 
-let cachegetFloat64Memory = null
-function getFloat64Memory () {
-  if (cachegetFloat64Memory === null || cachegetFloat64Memory.buffer !== wasm.memory.buffer) {
-    cachegetFloat64Memory = new Float64Array(wasm.memory.buffer)
-  }
-  return cachegetFloat64Memory
-}
+    static __wrap(ptr) {
+        const obj = Object.create(Obj.prototype);
+        obj.ptr = ptr;
 
-function passArrayF64ToWasm (arg) {
-  const ptr = wasm.__wbindgen_malloc(arg.length * 8)
-  getFloat64Memory().set(arg, ptr / 8)
-  return [ptr, arg.length]
-}
+        return obj;
+    }
 
-function getArrayU32FromWasm (ptr, len) {
-  return getUint32Memory().subarray(ptr / 4, ptr / 4 + len)
-}
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
 
-let cachedGlobalArgumentPtr = null
-function globalArgumentPtr () {
-  if (cachedGlobalArgumentPtr === null) {
-    cachedGlobalArgumentPtr = wasm.__wbindgen_global_argument_ptr()
-  }
-  return cachedGlobalArgumentPtr
-}
-
-function getArrayF64FromWasm (ptr, len) {
-  return getFloat64Memory().subarray(ptr / 8, ptr / 8 + len)
-}
-
-const lTextDecoder = typeof TextDecoder === 'undefined' ? require('util').TextDecoder : TextDecoder
-
-const cachedTextDecoder = new lTextDecoder('utf-8')
-
-let cachegetUint8Memory = null
-function getUint8Memory () {
-  if (cachegetUint8Memory === null || cachegetUint8Memory.buffer !== wasm.memory.buffer) {
-    cachegetUint8Memory = new Uint8Array(wasm.memory.buffer)
-  }
-  return cachegetUint8Memory
-}
-
-function getStringFromWasm (ptr, len) {
-  return cachedTextDecoder.decode(getUint8Memory().subarray(ptr, ptr + len))
-}
-
-export function __wbg_new_7186a5e444148014 (arg0, arg1) {
-  const varg0 = getStringFromWasm(arg0, arg1)
-  return addHeapObject(new Function(varg0))
-}
-
-const stack = []
-
-function getObject (idx) {
-  if ((idx & 1) === 1) {
-    return stack[idx >> 1]
-  } else {
-    const val = slab[idx >> 1]
-
-    return val.obj
-  }
-}
-
-export function __wbg_call_8e081ad59d82a596 (arg0, arg1) {
-  return addHeapObject(getObject(arg0).call(getObject(arg1)))
-}
-
-export function __wbg_self_0131cdbae6b5bd9f (arg0) {
-  return addHeapObject(getObject(arg0).self)
-}
-
-export function __wbg_crypto_cc35b393672098c8 (arg0) {
-  return addHeapObject(getObject(arg0).crypto)
-}
-
-export function __wbg_getRandomValues_535140a38ab83daf (arg0) {
-  return addHeapObject(getObject(arg0).getRandomValues)
-}
-
-function getArrayU8FromWasm (ptr, len) {
-  return getUint8Memory().subarray(ptr / 1, ptr / 1 + len)
-}
-
-export function __wbg_getRandomValues_2ad4d991ea29bdf7 (arg0, arg1, arg2) {
-  const varg1 = getArrayU8FromWasm(arg1, arg2)
-  getObject(arg0).getRandomValues(varg1)
-}
-
-export function __wbg_require_217dc25ba03e9505 (arg0, arg1) {
-  const varg0 = getStringFromWasm(arg0, arg1)
-  return addHeapObject(require(varg0))
-}
-
-export function __wbg_randomFillSync_0e5b46c8727fb4ad (arg0, arg1, arg2) {
-  const varg1 = getArrayU8FromWasm(arg1, arg2)
-  getObject(arg0).randomFillSync(varg1)
-}
-
-export function __wbg_new_55d176391eb5bbb4 () {
-  return addHeapObject(new Array())
-}
-
-export function __wbg_push_a3d2caf057c8ab57 (arg0, arg1) {
-  return getObject(arg0).push(getObject(arg1))
-}
-
-export function __wbg_call_6810db23cc77bd1a (arg0, arg1, arg2, exnptr) {
-  try {
-    return addHeapObject(getObject(arg0).call(getObject(arg1), getObject(arg2)))
-  } catch (e) {
-    const view = getUint32Memory()
-    view[exnptr / 4] = 1
-    view[exnptr / 4 + 1] = addHeapObject(e)
-  }
-}
-
-function freeOptFacadeBuilderJs (ptr) {
-  wasm.__wbg_optfacadebuilderjs_free(ptr)
+        wasm.__wbg_obj_free(ptr);
+    }
+    /**
+    * @param {number} od
+    * @param {Function} f
+    */
+    constructor(od, f) {
+        var ret = wasm.obj_new(od, addHeapObject(f));
+        return Obj.__wrap(ret);
+    }
 }
 /**
 */
-export class OptFacadeBuilderJs {
-  static __wrap (ptr) {
-    const obj = Object.create(OptFacadeBuilderJs.prototype)
-    obj.ptr = ptr
+export class OptFacade {
 
-    return obj
-  }
+    static __wrap(ptr) {
+        const obj = Object.create(OptFacade.prototype);
+        obj.ptr = ptr;
 
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeOptFacadeBuilderJs(ptr)
-  }
+        return obj;
+    }
 
-  /**
-    * @returns {}
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        wasm.__wbg_optfacade_free(ptr);
+    }
+    /**
+    * @param {OptProblem} problem
+    * @returns {any}
     */
-  constructor () {
-    this.ptr = wasm.optfacadebuilderjs_new()
-  }
-
-  /**
-    * @returns {OptFacadeJs}
-    */
-  build () {
-    const ptr = this.ptr
-    this.ptr = 0
-    return OptFacadeJs.__wrap(wasm.optfacadebuilderjs_build(ptr))
-  }
-
-  /**
-    * @param {number} arg0
-    * @returns {OptFacadeBuilderJs}
-    */
-  max_iterations (arg0) {
-    const ptr = this.ptr
-    this.ptr = 0
-    return OptFacadeBuilderJs.__wrap(wasm.optfacadebuilderjs_max_iterations(ptr, arg0))
-  }
-
-  /**
-    * @param {Float64Array} arg0
-    * @returns {OptFacadeBuilderJs}
-    */
-  objs_goals (arg0) {
-    const ptr = this.ptr
-    this.ptr = 0
-    const [ptr0, len0] = passArrayF64ToWasm(arg0)
-    return OptFacadeBuilderJs.__wrap(wasm.optfacadebuilderjs_objs_goals(ptr, ptr0, len0))
-  }
-
-  /**
-    * @param {OptProblemJs} arg0
-    * @returns {OptFacadeBuilderJs}
-    */
-  opt_problem (arg0) {
-    const ptr = this.ptr
-    this.ptr = 0
-    const ptr0 = arg0.ptr
-    arg0.ptr = 0
-    return OptFacadeBuilderJs.__wrap(wasm.optfacadebuilderjs_opt_problem(ptr, ptr0))
-  }
-
-  /**
-    * @param {PctJs} arg0
-    * @returns {OptFacadeBuilderJs}
-    */
-  stagnation_percentage (arg0) {
-    const ptr = this.ptr
-    this.ptr = 0
-    const ptr0 = arg0.ptr
-    arg0.ptr = 0
-    return OptFacadeBuilderJs.__wrap(wasm.optfacadebuilderjs_stagnation_percentage(ptr, ptr0))
-  }
-
-  /**
-    * @param {number} arg0
-    * @returns {OptFacadeBuilderJs}
-    */
-  stagnation_threshold (arg0) {
-    const ptr = this.ptr
-    this.ptr = 0
-    return OptFacadeBuilderJs.__wrap(wasm.optfacadebuilderjs_stagnation_threshold(ptr, arg0))
-  }
-}
-
-function freeHardCstrJs (ptr) {
-  wasm.__wbg_hardcstrjs_free(ptr)
+    solve(problem) {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        _assertClass(problem, OptProblem);
+        var ptr0 = problem.ptr;
+        problem.ptr = 0;
+        var ret = wasm.optfacade_solve(ptr, ptr0);
+        return takeObject(ret);
+    }
 }
 /**
 */
-export class HardCstrJs {
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeHardCstrJs(ptr)
-  }
+export class OptFacadeBuilder {
 
-  /**
-    * @param {any} arg0
-    * @returns {}
+    static __wrap(ptr) {
+        const obj = Object.create(OptFacadeBuilder.prototype);
+        obj.ptr = ptr;
+
+        return obj;
+    }
+
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        wasm.__wbg_optfacadebuilder_free(ptr);
+    }
+    /**
     */
-  constructor (arg0) {
-    this.ptr = wasm.hardcstrjs_new(addHeapObject(arg0))
-  }
-}
-
-function freeOptProblemJs (ptr) {
-  wasm.__wbg_optproblemjs_free(ptr)
-}
-/**
-*/
-export class OptProblemJs {
-  static __wrap (ptr) {
-    const obj = Object.create(OptProblemJs.prototype)
-    obj.ptr = ptr
-
-    return obj
-  }
-
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeOptProblemJs(ptr)
-  }
-
-  /**
-    * @param {OptProblemDefinitionsJs} arg0
-    * @returns {OptProblemJs}
+    constructor() {
+        var ret = wasm.optfacadebuilder_new();
+        return OptFacadeBuilder.__wrap(ret);
+    }
+    /**
+    * @param {OptProblem} problem
+    * @returns {OptFacade}
     */
-  static with_capacity (arg0) {
-    const ptr0 = arg0.ptr
-    arg0.ptr = 0
-    return OptProblemJs.__wrap(wasm.optproblemjs_with_capacity(ptr0))
-  }
-
-  /**
-    * @returns {OptProblemDefinitionsJs}
+    build(problem) {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        _assertClass(problem, OptProblem);
+        var ret = wasm.optfacadebuilder_build(ptr, problem.ptr);
+        return OptFacade.__wrap(ret);
+    }
+    /**
+    * @param {number} max_iterations
+    * @returns {OptFacadeBuilder}
     */
-  definitions () {
-    const ptr = this.ptr
-    this.ptr = 0
-    return OptProblemDefinitionsJs.__wrap(wasm.optproblemjs_definitions(ptr))
-  }
-
-  /**
-    * @returns {OptProblemResultsJs}
+    max_iterations(max_iterations) {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        var ret = wasm.optfacadebuilder_max_iterations(ptr, max_iterations);
+        return OptFacadeBuilder.__wrap(ret);
+    }
+    /**
+    * @param {Float64Array} objs_goals
+    * @returns {OptFacadeBuilder}
     */
-  results () {
-    const ptr = this.ptr
-    this.ptr = 0
-    return OptProblemResultsJs.__wrap(wasm.optproblemjs_results(ptr))
-  }
-}
-
-function freeDomainJs (ptr) {
-  wasm.__wbg_domainjs_free(ptr)
-}
-/**
-*/
-export class DomainJs {
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeDomainJs(ptr)
-  }
-
-  /**
-    * @param {any[]} arg0
-    * @returns {}
+    objs_goals(objs_goals) {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        var ptr0 = passArrayF64ToWasm0(objs_goals, wasm.__wbindgen_malloc);
+        var len0 = WASM_VECTOR_LEN;
+        var ret = wasm.optfacadebuilder_objs_goals(ptr, ptr0, len0);
+        return OptFacadeBuilder.__wrap(ret);
+    }
+    /**
+    * @param {Pct} stagnation_percentage
+    * @returns {OptFacadeBuilder}
     */
-  constructor (arg0) {
-    const [ptr0, len0] = passArrayJsValueToWasm(arg0)
-    this.ptr = wasm.domainjs_new(ptr0, len0)
-  }
-}
-
-function freeOptProblemDefinitionsJs (ptr) {
-  wasm.__wbg_optproblemdefinitionsjs_free(ptr)
+    stagnation_percentage(stagnation_percentage) {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        _assertClass(stagnation_percentage, Pct);
+        var ptr0 = stagnation_percentage.ptr;
+        stagnation_percentage.ptr = 0;
+        var ret = wasm.optfacadebuilder_stagnation_percentage(ptr, ptr0);
+        return OptFacadeBuilder.__wrap(ret);
+    }
+    /**
+    * @param {number} stagnation_threshold
+    * @returns {OptFacadeBuilder}
+    */
+    stagnation_threshold(stagnation_threshold) {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        var ret = wasm.optfacadebuilder_stagnation_threshold(ptr, stagnation_threshold);
+        return OptFacadeBuilder.__wrap(ret);
+    }
 }
 /**
 */
-export class OptProblemDefinitionsJs {
-  static __wrap (ptr) {
-    const obj = Object.create(OptProblemDefinitionsJs.prototype)
-    obj.ptr = ptr
+export class OptProblem {
 
-    return obj
-  }
+    static __wrap(ptr) {
+        const obj = Object.create(OptProblem.prototype);
+        obj.ptr = ptr;
 
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeOptProblemDefinitionsJs(ptr)
-  }
-}
+        return obj;
+    }
 
-function freeSolutionJs (ptr) {
-  wasm.__wbg_solutionjs_free(ptr)
-}
-/**
-*/
-export class SolutionJs {
-  static __wrap (ptr) {
-    const obj = Object.create(SolutionJs.prototype)
-    obj.ptr = ptr
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
 
-    return obj
-  }
-
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeSolutionJs(ptr)
-  }
-
-  /**
-    * @returns {Float64Array}
+        wasm.__wbg_optproblem_free(ptr);
+    }
+    /**
+    * @param {OptProblemDefinitions} definitions
+    * @param {number} results_num
+    * @returns {OptProblem}
     */
-  array () {
-    const retptr = globalArgumentPtr()
-    wasm.solutionjs_array(retptr, this.ptr)
-    const mem = getUint32Memory()
-    const rustptr = mem[retptr / 4]
-    const rustlen = mem[retptr / 4 + 1]
-
-    const realRet = getArrayF64FromWasm(rustptr, rustlen).slice()
-    wasm.__wbindgen_free(rustptr, rustlen * 8)
-    return realRet
-  }
-}
-
-function freeObjJs (ptr) {
-  wasm.__wbg_objjs_free(ptr)
+    static with_capacity(definitions, results_num) {
+        _assertClass(definitions, OptProblemDefinitions);
+        var ptr0 = definitions.ptr;
+        definitions.ptr = 0;
+        var ret = wasm.optproblem_with_capacity(ptr0, results_num);
+        return OptProblem.__wrap(ret);
+    }
+    /**
+    * @returns {OptProblemDefinitions}
+    */
+    definitions() {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        var ret = wasm.optproblem_definitions(ptr);
+        return OptProblemDefinitions.__wrap(ret);
+    }
+    /**
+    * @returns {OptProblemResults}
+    */
+    results() {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        var ret = wasm.optproblem_results(ptr);
+        return OptProblemResults.__wrap(ret);
+    }
 }
 /**
 */
-export class ObjJs {
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeObjJs(ptr)
-  }
+export class OptProblemDefinitions {
 
-  /**
-    * @param {number} arg0
-    * @param {any} arg1
-    * @returns {}
-    */
-  constructor (arg0, arg1) {
-    this.ptr = wasm.objjs_new(arg0, addHeapObject(arg1))
-  }
-}
+    static __wrap(ptr) {
+        const obj = Object.create(OptProblemDefinitions.prototype);
+        obj.ptr = ptr;
 
-function freeOptProblemResultsJs (ptr) {
-  wasm.__wbg_optproblemresultsjs_free(ptr)
+        return obj;
+    }
+
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        wasm.__wbg_optproblemdefinitions_free(ptr);
+    }
 }
 /**
 */
-export class OptProblemResultsJs {
-  static __wrap (ptr) {
-    const obj = Object.create(OptProblemResultsJs.prototype)
-    obj.ptr = ptr
+export class OptProblemDefinitionsBuilder {
 
-    return obj
-  }
+    static __wrap(ptr) {
+        const obj = Object.create(OptProblemDefinitionsBuilder.prototype);
+        obj.ptr = ptr;
 
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeOptProblemResultsJs(ptr)
-  }
+        return obj;
+    }
 
-  /**
-    * @returns {OptProblemResultJs}
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        wasm.__wbg_optproblemdefinitionsbuilder_free(ptr);
+    }
+    /**
     */
-  best () {
-    return OptProblemResultJs.__wrap(wasm.optproblemresultsjs_best(this.ptr))
-  }
-
-  /**
-    * @param {number} arg0
-    * @returns {OptProblemResultJs}
+    constructor() {
+        var ret = wasm.optproblemdefinitionsbuilder_new();
+        return OptProblemDefinitionsBuilder.__wrap(ret);
+    }
+    /**
+    * @returns {OptProblemDefinitions}
     */
-  get (arg0) {
-    return OptProblemResultJs.__wrap(wasm.optproblemresultsjs_get(this.ptr, arg0))
-  }
-
-  /**
-    * @returns {number}
+    build() {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        var ret = wasm.optproblemdefinitionsbuilder_build(ptr);
+        return OptProblemDefinitions.__wrap(ret);
+    }
+    /**
+    * @param {SolutionDomain} solution_domain
+    * @returns {OptProblemDefinitionsBuilder}
     */
-  len () {
-    return wasm.optproblemresultsjs_len(this.ptr)
-  }
-}
-
-function freeOptProblemDefinitionsBuilderJs (ptr) {
-  wasm.__wbg_optproblemdefinitionsbuilderjs_free(ptr)
-}
-/**
-*/
-export class OptProblemDefinitionsBuilderJs {
-  static __wrap (ptr) {
-    const obj = Object.create(OptProblemDefinitionsBuilderJs.prototype)
-    obj.ptr = ptr
-
-    return obj
-  }
-
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeOptProblemDefinitionsBuilderJs(ptr)
-  }
-
-  /**
-    * @returns {}
+    domain(solution_domain) {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        _assertClass(solution_domain, SolutionDomain);
+        var ptr0 = solution_domain.ptr;
+        solution_domain.ptr = 0;
+        var ret = wasm.optproblemdefinitionsbuilder_domain(ptr, ptr0);
+        return OptProblemDefinitionsBuilder.__wrap(ret);
+    }
+    /**
+    * @param {string} name
+    * @returns {OptProblemDefinitionsBuilder}
     */
-  constructor () {
-    this.ptr = wasm.optproblemdefinitionsbuilderjs_new()
-  }
-
-  /**
-    * @returns {OptProblemDefinitionsJs}
+    name(name) {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        var ptr0 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len0 = WASM_VECTOR_LEN;
+        var ret = wasm.optproblemdefinitionsbuilder_name(ptr, ptr0, len0);
+        return OptProblemDefinitionsBuilder.__wrap(ret);
+    }
+    /**
+    * @param {HardCstr} hard_cstr
+    * @returns {OptProblemDefinitionsBuilder}
     */
-  build () {
-    const ptr = this.ptr
-    this.ptr = 0
-    return OptProblemDefinitionsJs.__wrap(wasm.optproblemdefinitionsbuilderjs_build(ptr))
-  }
-
-  /**
-    * @param {DomainJs} arg0
-    * @returns {OptProblemDefinitionsBuilderJs}
+    push_hard_cstr(hard_cstr) {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        _assertClass(hard_cstr, HardCstr);
+        var ptr0 = hard_cstr.ptr;
+        hard_cstr.ptr = 0;
+        var ret = wasm.optproblemdefinitionsbuilder_push_hard_cstr(ptr, ptr0);
+        return OptProblemDefinitionsBuilder.__wrap(ret);
+    }
+    /**
+    * @param {Obj} obj
+    * @returns {OptProblemDefinitionsBuilder}
     */
-  domain (arg0) {
-    const ptr = this.ptr
-    this.ptr = 0
-    const ptr0 = arg0.ptr
-    arg0.ptr = 0
-    return OptProblemDefinitionsBuilderJs.__wrap(wasm.optproblemdefinitionsbuilderjs_domain(ptr, ptr0))
-  }
-
-  /**
-    * @param {HardCstrJs} arg0
-    * @returns {OptProblemDefinitionsBuilderJs}
-    */
-  push_hard_cstr (arg0) {
-    const ptr = this.ptr
-    this.ptr = 0
-    const ptr0 = arg0.ptr
-    arg0.ptr = 0
-    return OptProblemDefinitionsBuilderJs.__wrap(wasm.optproblemdefinitionsbuilderjs_push_hard_cstr(ptr, ptr0))
-  }
-
-  /**
-    * @param {ObjJs} arg0
-    * @returns {OptProblemDefinitionsBuilderJs}
-    */
-  push_obj (arg0) {
-    const ptr = this.ptr
-    this.ptr = 0
-    const ptr0 = arg0.ptr
-    arg0.ptr = 0
-    return OptProblemDefinitionsBuilderJs.__wrap(wasm.optproblemdefinitionsbuilderjs_push_obj(ptr, ptr0))
-  }
-
-  /**
-    * @param {number} arg0
-    * @returns {OptProblemDefinitionsBuilderJs}
-    */
-  results_num (arg0) {
-    const ptr = this.ptr
-    this.ptr = 0
-    return OptProblemDefinitionsBuilderJs.__wrap(wasm.optproblemdefinitionsbuilderjs_results_num(ptr, arg0))
-  }
-
-  /**
-    * @param {number} arg0
-    * @param {number} arg1
-    * @returns {OptProblemDefinitionsBuilderJs}
-    */
-  vars_num (arg0, arg1) {
-    const ptr = this.ptr
-    this.ptr = 0
-    return OptProblemDefinitionsBuilderJs.__wrap(wasm.optproblemdefinitionsbuilderjs_vars_num(ptr, arg0, arg1))
-  }
-}
-
-function freeOptProblemResultJs (ptr) {
-  wasm.__wbg_optproblemresultjs_free(ptr)
+    push_obj(obj) {
+        var ptr = this.ptr;
+        this.ptr = 0;
+        _assertClass(obj, Obj);
+        var ptr0 = obj.ptr;
+        obj.ptr = 0;
+        var ret = wasm.optproblemdefinitionsbuilder_push_obj(ptr, ptr0);
+        return OptProblemDefinitionsBuilder.__wrap(ret);
+    }
 }
 /**
 */
-export class OptProblemResultJs {
-  static __wrap (ptr) {
-    const obj = Object.create(OptProblemResultJs.prototype)
-    obj.ptr = ptr
+export class OptProblemResult {
 
-    return obj
-  }
+    static __wrap(ptr) {
+        const obj = Object.create(OptProblemResult.prototype);
+        obj.ptr = ptr;
 
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeOptProblemResultJs(ptr)
-  }
+        return obj;
+    }
 
-  /**
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        wasm.__wbg_optproblemresult_free(ptr);
+    }
+    /**
     * @returns {Uint32Array}
     */
-  hard_cstrs_results () {
-    const retptr = globalArgumentPtr()
-    wasm.optproblemresultjs_hard_cstrs_results(retptr, this.ptr)
-    const mem = getUint32Memory()
-    const rustptr = mem[retptr / 4]
-    const rustlen = mem[retptr / 4 + 1]
-
-    const realRet = getArrayU32FromWasm(rustptr, rustlen).slice()
-    wasm.__wbindgen_free(rustptr, rustlen * 4)
-    return realRet
-  }
-
-  /**
+    hard_cstrs() {
+        wasm.optproblemresult_hard_cstrs(8, this.ptr);
+        var r0 = getInt32Memory0()[8 / 4 + 0];
+        var r1 = getInt32Memory0()[8 / 4 + 1];
+        var v0 = getArrayU32FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_free(r0, r1 * 4);
+        return v0;
+    }
+    /**
     * @returns {Float64Array}
     */
-  objs () {
-    const retptr = globalArgumentPtr()
-    wasm.optproblemresultjs_objs(retptr, this.ptr)
-    const mem = getUint32Memory()
-    const rustptr = mem[retptr / 4]
-    const rustlen = mem[retptr / 4 + 1]
-
-    const realRet = getArrayF64FromWasm(rustptr, rustlen).slice()
-    wasm.__wbindgen_free(rustptr, rustlen * 8)
-    return realRet
-  }
-
-  /**
+    objs() {
+        wasm.optproblemresult_objs(8, this.ptr);
+        var r0 = getInt32Memory0()[8 / 4 + 0];
+        var r1 = getInt32Memory0()[8 / 4 + 1];
+        var v0 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_free(r0, r1 * 8);
+        return v0;
+    }
+    /**
     * @returns {number}
     */
-  objs_avg () {
-    return wasm.optproblemresultjs_objs_avg(this.ptr)
-  }
-
-  /**
-    * @returns {SolutionJs}
+    objs_avg() {
+        var ret = wasm.optproblemresult_objs_avg(this.ptr);
+        return ret;
+    }
+    /**
+    * @returns {Solution}
     */
-  solution () {
-    return SolutionJs.__wrap(wasm.optproblemresultjs_solution(this.ptr))
-  }
-}
-
-function freePctJs (ptr) {
-  wasm.__wbg_pctjs_free(ptr)
+    solution() {
+        var ret = wasm.optproblemresult_solution(this.ptr);
+        return Solution.__wrap(ret);
+    }
 }
 /**
 */
-export class PctJs {
-  static __wrap (ptr) {
-    const obj = Object.create(PctJs.prototype)
-    obj.ptr = ptr
+export class OptProblemResults {
 
-    return obj
-  }
+    static __wrap(ptr) {
+        const obj = Object.create(OptProblemResults.prototype);
+        obj.ptr = ptr;
 
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freePctJs(ptr)
-  }
+        return obj;
+    }
 
-  /**
-    * @param {number} arg0
-    * @returns {PctJs}
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        wasm.__wbg_optproblemresults_free(ptr);
+    }
+    /**
+    * @returns {OptProblemResult | undefined}
     */
-  static from_decimal (arg0) {
-    return PctJs.__wrap(wasm.pctjs_from_decimal(arg0))
-  }
-
-  /**
-    * @param {number} arg0
-    * @returns {PctJs}
+    best() {
+        var ret = wasm.optproblemresults_best(this.ptr);
+        return ret === 0 ? undefined : OptProblemResult.__wrap(ret);
+    }
+    /**
+    * @param {number} idx
+    * @returns {OptProblemResult}
     */
-  static from_percent (arg0) {
-    return PctJs.__wrap(wasm.pctjs_from_percent(arg0))
-  }
-}
-
-function freeOptFacadeJs (ptr) {
-  wasm.__wbg_optfacadejs_free(ptr)
+    get(idx) {
+        var ret = wasm.optproblemresults_get(this.ptr, idx);
+        return OptProblemResult.__wrap(ret);
+    }
+    /**
+    * @returns {number}
+    */
+    len() {
+        var ret = wasm.optproblemresults_len(this.ptr);
+        return ret >>> 0;
+    }
 }
 /**
 */
-export class OptFacadeJs {
-  static __wrap (ptr) {
-    const obj = Object.create(OptFacadeJs.prototype)
-    obj.ptr = ptr
+export class Pct {
 
-    return obj
-  }
+    static __wrap(ptr) {
+        const obj = Object.create(Pct.prototype);
+        obj.ptr = ptr;
 
-  free () {
-    const ptr = this.ptr
-    this.ptr = 0
-    freeOptFacadeJs(ptr)
-  }
+        return obj;
+    }
 
-  /**
-    * @returns {OptProblemJs}
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        wasm.__wbg_pct_free(ptr);
+    }
+    /**
+    * @param {number} pct
+    * @returns {Pct}
     */
-  opt_problem () {
-    const ptr = this.ptr
-    this.ptr = 0
-    return OptProblemJs.__wrap(wasm.optfacadejs_opt_problem(ptr))
-  }
-
-  /**
-    * @returns {OptFacadeJs}
+    static from_decimal(pct) {
+        var ret = wasm.pct_from_decimal(pct);
+        return Pct.__wrap(ret);
+    }
+    /**
+    * @param {number} pct
+    * @returns {Pct}
     */
-  solve () {
-    const ptr = this.ptr
-    this.ptr = 0
-    return OptFacadeJs.__wrap(wasm.optfacadejs_solve(ptr))
-  }
+    static from_percent(pct) {
+        var ret = wasm.pct_from_percent(pct);
+        return Pct.__wrap(ret);
+    }
+}
+/**
+*/
+export class Solution {
+
+    static __wrap(ptr) {
+        const obj = Object.create(Solution.prototype);
+        obj.ptr = ptr;
+
+        return obj;
+    }
+
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        wasm.__wbg_solution_free(ptr);
+    }
+    /**
+    * @returns {Float64Array}
+    */
+    array() {
+        wasm.solution_array(8, this.ptr);
+        var r0 = getInt32Memory0()[8 / 4 + 0];
+        var r1 = getInt32Memory0()[8 / 4 + 1];
+        var v0 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_free(r0, r1 * 8);
+        return v0;
+    }
+}
+/**
+*/
+export class SolutionDomain {
+
+    static __wrap(ptr) {
+        const obj = Object.create(SolutionDomain.prototype);
+        obj.ptr = ptr;
+
+        return obj;
+    }
+
+    free() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        wasm.__wbg_solutiondomain_free(ptr);
+    }
+    /**
+    * @param {any[]} ranges
+    */
+    constructor(ranges) {
+        var ptr0 = passArrayJsValueToWasm0(ranges, wasm.__wbindgen_malloc);
+        var len0 = WASM_VECTOR_LEN;
+        var ret = wasm.solutiondomain_new(ptr0, len0);
+        return SolutionDomain.__wrap(ret);
+    }
 }
 
-function dropRef (idx) {
-  idx = idx >> 1
-  if (idx < 4) return
-  const obj = slab[idx]
+export const __wbindgen_object_drop_ref = function(arg0) {
+    takeObject(arg0);
+};
 
-  obj.cnt -= 1
-  if (obj.cnt > 0) return
+export const __wbg_new_ec28d6ba821801cb = function() {
+    var ret = new Array();
+    return addHeapObject(ret);
+};
 
-  // If we hit 0 then free up our space in the slab
-  slab[idx] = slab_next
-  slab_next = idx
-}
+export const __wbindgen_number_new = function(arg0) {
+    var ret = arg0;
+    return addHeapObject(ret);
+};
 
-export function __wbindgen_object_drop_ref (i) {
-  dropRef(i)
-}
+export const __wbg_push_ffaa2df7422d3b4c = function(arg0, arg1) {
+    var ret = getObject(arg0).push(getObject(arg1));
+    return ret;
+};
 
-export function __wbindgen_number_new (i) {
-  return addHeapObject(i)
-}
+export const __wbg_call_1ad0eb4a7ab279eb = function(arg0, arg1, arg2) {
+    try {
+        var ret = getObject(arg0).call(getObject(arg1), getObject(arg2));
+        return addHeapObject(ret);
+    } catch (e) {
+        handleError(e)
+    }
+};
 
-export function __wbindgen_number_get (n, invalid) {
-  const obj = getObject(n)
-  if (typeof (obj) === 'number') return obj
-  getUint8Memory()[invalid] = 1
-  return 0
-}
+export const __wbindgen_number_get = function(arg0, arg1) {
+    const obj = getObject(arg1);
+    var ret = typeof(obj) === 'number' ? obj : undefined;
+    getFloat64Memory0()[arg0 / 8 + 1] = isLikeNone(ret) ? 0 : ret;
+    getInt32Memory0()[arg0 / 4 + 0] = !isLikeNone(ret);
+};
 
-export function __wbindgen_is_null (idx) {
-  return getObject(idx) === null ? 1 : 0
-}
+export const __wbg_optproblem_new = function(arg0) {
+    var ret = OptProblem.__wrap(arg0);
+    return addHeapObject(ret);
+};
 
-export function __wbindgen_is_undefined (idx) {
-  return getObject(idx) === undefined ? 1 : 0
-}
+export const __wbindgen_string_get = function(arg0, arg1) {
+    const obj = getObject(arg1);
+    var ret = typeof(obj) === 'string' ? obj : undefined;
+    var ptr0 = isLikeNone(ret) ? 0 : passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len0 = WASM_VECTOR_LEN;
+    getInt32Memory0()[arg0 / 4 + 1] = len0;
+    getInt32Memory0()[arg0 / 4 + 0] = ptr0;
+};
 
-export function __wbindgen_boolean_get (i) {
-  const v = getObject(i)
-  if (typeof (v) === 'boolean') {
-    return v ? 1 : 0
-  } else {
-    return 2
-  }
-}
+export const __wbg_new_1bf1b0dbcaa9ee96 = function(arg0, arg1) {
+    try {
+        var state0 = {a: arg0, b: arg1};
+        var cb0 = (arg0, arg1) => {
+            const a = state0.a;
+            state0.a = 0;
+            try {
+                return __wbg_adapter_68(a, state0.b, arg0, arg1);
+            } finally {
+                state0.a = a;
+            }
+        };
+        var ret = new Promise(cb0);
+        return addHeapObject(ret);
+    } finally {
+        state0.a = state0.b = 0;
+    }
+};
 
-export function __wbindgen_is_symbol (i) {
-  return typeof (getObject(i)) === 'symbol' ? 1 : 0
-}
+export const __wbg_self_1b7a39e3a92c949c = function() {
+    try {
+        var ret = self.self;
+        return addHeapObject(ret);
+    } catch (e) {
+        handleError(e)
+    }
+};
 
-const lTextEncoder = typeof TextEncoder === 'undefined' ? require('util').TextEncoder : TextEncoder
+export const __wbg_require_604837428532a733 = function(arg0, arg1) {
+    var ret = require(getStringFromWasm0(arg0, arg1));
+    return addHeapObject(ret);
+};
 
-const cachedTextEncoder = new lTextEncoder('utf-8')
+export const __wbg_crypto_968f1772287e2df0 = function(arg0) {
+    var ret = getObject(arg0).crypto;
+    return addHeapObject(ret);
+};
 
-function passStringToWasm (arg) {
-  const buf = cachedTextEncoder.encode(arg)
-  const ptr = wasm.__wbindgen_malloc(buf.length)
-  getUint8Memory().set(buf, ptr)
-  return [ptr, buf.length]
-}
+export const __wbindgen_is_undefined = function(arg0) {
+    var ret = getObject(arg0) === undefined;
+    return ret;
+};
 
-export function __wbindgen_string_get (i, len_ptr) {
-  const obj = getObject(i)
-  if (typeof (obj) !== 'string') return 0
-  const [ptr, len] = passStringToWasm(obj)
-  getUint32Memory()[len_ptr / 4] = len
-  return ptr
-}
+export const __wbg_getRandomValues_a3d34b4fee3c2869 = function(arg0) {
+    var ret = getObject(arg0).getRandomValues;
+    return addHeapObject(ret);
+};
 
-export function __wbindgen_jsval_eq (a, b) {
-  return getObject(a) === getObject(b) ? 1 : 0
-}
+export const __wbg_randomFillSync_d5bd2d655fdf256a = function(arg0, arg1, arg2) {
+    getObject(arg0).randomFillSync(getArrayU8FromWasm0(arg1, arg2));
+};
 
-export function __wbindgen_throw (ptr, len) {
-  throw new Error(getStringFromWasm(ptr, len))
-}
+export const __wbg_getRandomValues_f5e14ab7ac8e995d = function(arg0, arg1, arg2) {
+    getObject(arg0).getRandomValues(getArrayU8FromWasm0(arg1, arg2));
+};
+
+export const __wbindgen_debug_string = function(arg0, arg1) {
+    var ret = debugString(getObject(arg1));
+    var ptr0 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len0 = WASM_VECTOR_LEN;
+    getInt32Memory0()[arg0 / 4 + 1] = len0;
+    getInt32Memory0()[arg0 / 4 + 0] = ptr0;
+};
+
+export const __wbindgen_throw = function(arg0, arg1) {
+    throw new Error(getStringFromWasm0(arg0, arg1));
+};
+
+export const __wbg_resolve_3e5970e9c931a3c2 = function(arg0) {
+    var ret = Promise.resolve(getObject(arg0));
+    return addHeapObject(ret);
+};
+
+export const __wbindgen_cb_drop = function(arg0) {
+    const obj = takeObject(arg0).original;
+    if (obj.cnt-- == 1) {
+        obj.a = 0;
+        return true;
+    }
+    var ret = false;
+    return ret;
+};
+
+export const __wbg_then_d797310661d9e275 = function(arg0, arg1) {
+    var ret = getObject(arg0).then(getObject(arg1));
+    return addHeapObject(ret);
+};
+
+export const __wbindgen_closure_wrapper652 = function(arg0, arg1, arg2) {
+    var ret = makeMutClosure(arg0, arg1, 25, __wbg_adapter_18);
+    return addHeapObject(ret);
+};
+
